@@ -1,21 +1,25 @@
 (function () {
     'use strict';
-    var Temperature = $("#temperature");
     var displayDegreeSymbol = $("#degreeSymbol");
     var displayHumidity = $("#humidity");
-    var displayConditions = $("#conditions");
+    
     var displayWinds = $("#winds");
     var displayPressure = $("#pressure");
     var displaySunrise = $("#sunrise");
     var displaySunset = $("#sunset");
     var button = $("#unit");
     var backgroundPicture = "https://s3-us-west-2.amazonaws.com/s.cdpn.io/368633/clear.jpg"; // set default background picture.
+   
+   
     var cityName = "";
     var regionName = "";
     var countryName = "";
     var locationString = "";
     var latitude = "";
     var longitude = "";
+    var latlon = "";
+
+
     var countryUnits = "metric";                                        // set default measurement system to metric.
     var temperature = "";
     var windSpeed = "";
@@ -23,8 +27,7 @@
     var humidity = "";
     var pressure = "";
     var pressureSymbol = "kPa";                                         // set default pressure units.
-    var sunrise = "";
-    var sunset = "";
+    
     var currentWeather = "";
     var tempSymbol = "C";                                               // set default temperature units.
     var windSymbol = 'km/h';                                            // set default wind speed units.
@@ -40,71 +43,50 @@
             var cityName = google.loader.ClientLocation.address.city;
             var countryName = google.loader.ClientLocation.address.country;
             var regionName = google.loader.ClientLocation.address.region;
-            console.log('The current city is' + cityName + countryName + regionName + latitude + longitude);
+            console.log('The current city is' + cityName + regionName + countryName + latitude + longitude);
             $("#city").html(cityName);
             $("#country").html(regionName + ", " + countryName); 
-         
+            $("#latlon").html('Longitude:' +longitude+ ',  Latitude:' + latitude);
+            var url = 'https://fcc-weather-api.glitch.me//api/current?&lat='+latitude+'&lon='+longitude+'&preventCache=' + new Date();
+            var weatherRequest = new XMLHttpRequest();
+                weatherRequest.onreadystatechange = function () {
+                    if (weatherRequest.readyState === 4 && weatherRequest.status === 200) {
+                        var object = JSON.parse(weatherRequest.responseText);
+                        processResponse(object); 
+                        setCountryUnits(object);                   
+                    }
+                };
+                weatherRequest.open("GET", url, true);                          // true sets asynchronous mode.
+                weatherRequest.send(); 
+                
         } else {  
             $("#location").html('Google was not able to detect your location'); 
         }
          
-        //  getWeatherData(); 
-     
+        // getWeather(); 
+    
     }
      
     
     
-    // function locationByIP() {
-    //     var locationRequest = new XMLHttpRequest();
-    //     locationRequest.onreadystatechange = function () {
-    //         if (locationRequest.readyState === 4 && locationRequest.status === 200) {  // ready state 'complete.'
-    //             var locationObj = JSON.parse(locationRequest.responseText);            // parse JSON response.
-    //             cityName = locationObj.city;                            // extract user's city, region, country.
-    //             regionName = locationObj.region;
-    //             countryName = locationObj.country;
-    //             locationString = locationObj.loc.split(',');           // split loc ( loc": "45.0834,-64.4988" )
-    //             latitude = Number(locationString[0]);
-    //             longitude = Number(locationString[1]);
-    //             setCountryUnits();                                      // set units of measure, imperial or metric.
-    //             getWeatherData();                                       // get user's local weather.
-    //         }
-    //     };
-    //     locationRequest.open("GET", 'https://ipinfo.io/json', true);     // true sets asynchronous mode.
-    //     locationRequest.send();                                         // send the information request to website.
-    // }
+  
 
-    /* function setCountryUnits() determines if user's country uses imperial or metric units of measure. */
-    function setCountryUnits() {
-        if (countryName === 'US' || countryName === 'LY') {             // in year 2016 only USA and Libya not metric.
-            countryUnits = 'imperial';
+    function setCountryUnits(obj) {
+        if (obj.sys.country === 'US' || obj.sys.country === 'LY'|| obj.sys.country === 'NM') {        
+            countryUnits = 'fahrenheit';
+            console.log('current country unites is '+countryUnits)
+        }else{
+            countryUnits = 'celsius';
+            console.log('current country unites is '+countryUnits)
+
         }
     }
 
-    /* function getWeatherData() queries openweathermap.org for local weather at user's longitude and latitude. */
-    fetch('https://api.openweathermap.org/data/2.5/weather?q={city name}')
-    .then((res) => res.json())
-    .then(function(data){
-        
-    })
-    
-    function getWeatherData() {
-        var url = 'https://cors.5apps.com/?uri=http://api.openweathermap.org/data/2.5/weather?lat=' + latitude + '&lon=' +  // build query url.
-            longitude + '&APPID=608f2325a0ac32149fd498a3ebf24641' +
-            '&units=' + countryUnits + '&preventCache=' + new Date();   // Date prevents caching old data.
-        var weatherRequest = new XMLHttpRequest();
-        weatherRequest.onreadystatechange = function () {
-            if (weatherRequest.readyState === 4 && weatherRequest.status === 200) {
-                var obj = JSON.parse(weatherRequest.responseText);
-                processResponse(obj);                     // call processResponse() passing in local weather data.
-            }
-        };
-        weatherRequest.open("GET", url, true);                          // true sets asynchronous mode.
-        weatherRequest.send();                                          // send the information request to website.
-    }
-
-    /* function processResponse() receives local weather data and updates weather data variables. */
     function processResponse(obj) {
+        console.log(obj,"test2");
         temperature = Math.round(obj.main.temp);
+        console.log(temperature);
+
         if (countryUnits === 'metric') {                                // checks if metric country.
             windSpeed = Math.round(obj.wind.speed * 18 / 5);            // convert meter/sec to km/hour. (metric)
             pressure = Math.round(obj.main.pressure) / 10;              // convert to kPa from hPa. (metric)
@@ -116,45 +98,36 @@
         windDirection = degreeToCardinal(obj.wind.deg);      // convert from degrees to cardinal wind direction.
         currentWeather = obj.weather[0].description;
         humidity = obj.main.humidity;
-        var sunriseDateObj = unixTimeToLocal(obj.sys.sunrise);          // convert to user's time zone, pretty format.
-        sunrise = sunriseDateObj.toLocaleTimeString();
-        var sunsetDateObj = unixTimeToLocal(obj.sys.sunset);            // convert to user's time zone, pretty format.
-        sunset = sunsetDateObj.toLocaleTimeString();
-        iconURL = 'https://cors.5apps.com/?uri=http://openweathermap.org/img/w/' + obj.weather[0].icon + '.png';  // fetch correct weather icon.
-        weatherPicture();                         // set appropriate background picture to local weather conditions.
-        displayData();                         // update webpage with new data.
+       
+        iconURL = 'https://cors.5apps.com/?uri=http://openweathermap.org/img/w/' + obj.weather[0].icon + '.png';  // fetch correct weather icon.    
+        weatherPicture();  
+        displayData();
+                          
     }
 
     /* function displayRefresh() updates the DOM using latest weather data. */
     function displayData() {
-        $("#city").html(cityName);
-        $("#country").html(regionName + ", " + countryName); 
-        // Temperature.innerHTML = temperature;
-        // displayDegreeSymbol.innerHTML = " &deg;" + tempSymbol;
-        // displayConditions.innerHTML = currentWeather;
-        // displayWinds.innerHTML = "Winds " + windDirection + " " + windSpeed + " " + windSymbol;
-        // displayPressure.innerHTML = "Barometric Pressure: " + pressure + " " + pressureSymbol;
-        // displayHumidity.innerHTML = "Humidity: " + humidity + "%";
-        // displaySunrise.innerHTML = "Sunrise at " + sunrise;
-        // displaySunset.innerHTML = "Sunset at " + sunset;
-        // var newElement = document.createElement('img');                 // new DOM element for weather icon.
+        $("#temperature").html('Current temperature is ' +temperature+'&deg; '+tempSymbol);
+        $("#conditions").html(currentWeather);
+        $("#winds").html('Winds '+windDirection + " " + windSpeed + " " + windSymbol);
+        var newElement = document.createElement('img');                 // new DOM element for weather icon.
         // newElement.src = iconURL;
         // newElement.setAttribute("id", "icons");
         // $("#icon").append(newElement);
-        // var image = backgroundPicture;
-        // var referenceMainWrapper = $("#main");
-        // referenceMainWrapper.style.backgroundImage = 'url(' + image + ')';
-        // referenceMainWrapper.style.backgroundSize = "100% auto";
+        var image = backgroundPicture;
+        $("#main").css("background-image", "url(image)");
+        $("#main").css("background-size", "100% auto");
     }
+    
 
     /* function toggleUnits() allows user to flip between imperial and metric units of measure. */
     function toggleUnits() {
-        if (countryUnits === 'metric') {                           // check if currently set to imperial or metric.
+        if (countryUnits === 'fahrenheit') {                           // check if currently set to imperial or metric.
             tempSymbol = 'F';
             windSymbol = 'miles/hour';
-            countryUnits = 'imperial';
+            countryUnits = 'celsius';
             pressureSymbol = 'mb';
-            button.innerHTML = 'Use Metric Units';
+            $("#unit").html = 'Use Metric Units';
             temperature = Math.round((temperature * 9 / 5) + 32);       // convert temperature to 'fahrenheit'.
             displayTemperature.innerHTML = temperature;
             displayDegreeSymbol.innerHTML = " &deg;" + tempSymbol;
@@ -168,7 +141,7 @@
             countryUnits = 'metric';
             windSymbol = 'km/hour';
             pressureSymbol = 'kPa';
-            button.innerHTML = 'Use Imperial Units';
+            $("#unit").html = 'Use Imperial Units';
             temperature = Math.round((temperature - 32) * 5 / 9);       // convert temperature to 'celsius'.
             displayTemperature.innerHTML = temperature;
             displayDegreeSymbol.innerHTML = " &deg;" + tempSymbol;
@@ -179,13 +152,7 @@
         }
     }
 
-    /* function unixTimeToLocal() is passed a date set in unix time, and returns a Date object in the user's
-     * local time. */
-    function unixTimeToLocal(unix) {
-        var local = new Date(0);
-        local.setUTCSeconds(unix);
-        return local;
-    }
+
 
     /* function degreeToCardinal() is passed a direction in degrees, and returns a cardinal direction. */
     function degreeToCardinal(degree) {
@@ -218,7 +185,7 @@
                 backgroundPicture = 'https://s3-us-west-2.amazonaws.com/s.cdpn.io/368633/overcast.jpg';
                 break;
             case /\bclouds\b/i.test(currentWeather):
-                backgroundPicture = 'https://s3-us-west-2.amazonaws.com/s.cdpn.io/368633/mostly_cloudy.jpg';
+                backgroundPicture = 'https://images.unsplash.com/photo-1482192596544-9eb780fc7f66?ixlib=rb-0.3.5&ixid=eyJhcHBfaWQiOjEyMDd9&s=bbe0bd1ecfaaa91394e0c9effb8b0415&auto=format&fit=crop&w=1350&q=80';
                 break;
             case /\brain\b/i.test(currentWeather):
                 backgroundPicture = 'https://s3-us-west-2.amazonaws.com/s.cdpn.io/368633/rainy.jpg';
